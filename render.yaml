@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: streambench-java
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: MAX_STREAMS
+        value: "32"

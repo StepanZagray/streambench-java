@@ -1,0 +1,11 @@
+.git
+node_modules
+target
+build
+server
+tests
+docs
+scripts
+data/source
+.env
+.env.*
