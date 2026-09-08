@@ -17,6 +17,6 @@ if [ -z "$jdk" ]; then
 fi
 
 mkdir -p "$script_dir/build"
-"$jdk/bin/javac" --release 21 --add-modules jdk.httpserver -d "$script_dir/build" "$script_dir/src/Streambench.java"
+"$jdk/bin/javac" --release 21 --add-modules jdk.httpserver -d "$script_dir/build" "$script_dir"/src/*.java
 # Preserve the caller's working directory for the DATA_DIR=data default.
 exec "$jdk/bin/java" --add-modules jdk.httpserver -cp "$script_dir/build" Streambench

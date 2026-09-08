@@ -1,7 +1,7 @@
 FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /build
-COPY src/Streambench.java ./Streambench.java
-RUN javac --release 21 --add-modules jdk.httpserver -d classes Streambench.java
+COPY src/ ./src/
+RUN javac --release 21 --add-modules jdk.httpserver -d classes src/*.java
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app

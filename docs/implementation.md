@@ -55,7 +55,7 @@ costs of this stack; comparisons should report them and the exact JDK version.
 ```sh
 /usr/lib/jvm/java-21-openjdk/bin/javac --release 21 --add-modules jdk.httpserver \
   -Xlint:all -d build \
-  src/Streambench.java tests/StreambenchTest.java
+  src/*.java tests/*.java
 /usr/lib/jvm/java-21-openjdk/bin/java -XX:ActiveProcessorCount=2 \
   --add-modules jdk.httpserver -cp build StreambenchTest --stalled
 sh -n run.sh
@@ -76,3 +76,5 @@ python3 tests/contract.py --backend java --stalled -- ./run.sh
 
 The harness creates/removes temporary fixtures and captures, stops, and reaps
 its server processes. Native compilation used OpenJDK 21.0.12.1. Real HTTP, disconnect and stalled-reader tests passed in the main workspace, including slot release and socket closure at the 130-second deadline. Docker image builds could not be run because the session has no Docker socket access.
+
+Distributed source/client protocol and limits: [docs/distributed.md](distributed.md). Run `DistributedTest` after compiling the Java tests for additional lifecycle checks.

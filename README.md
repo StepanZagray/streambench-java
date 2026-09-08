@@ -39,10 +39,12 @@ docker run --rm -p 8080:8080 streambench-java
 ```sh
 mkdir -p build
 JAVA_HOME=/usr/lib/jvm/java-21-openjdk
-"$JAVA_HOME/bin/javac" --release 21 --add-modules jdk.httpserver -d build src/Streambench.java tests/StreambenchTest.java
+"$JAVA_HOME/bin/javac" --release 21 --add-modules jdk.httpserver -d build src/*.java tests/*.java
 "$JAVA_HOME/bin/java" --add-modules jdk.httpserver -cp build StreambenchTest
 ```
 
 The frontend repository contains optional cross-backend protocol tests when all five repositories are checked out as siblings. Local native implementations have been tested; Docker image builds and Render deployment have not been verified because the local Docker socket was unavailable.
 
 Additional implementation notes and standalone TCP checks: [docs/implementation.md](docs/implementation.md).
+
+Distributed source/client protocol and limits: [docs/distributed.md](docs/distributed.md). Run `DistributedTest` after compiling the Java tests for additional lifecycle checks.

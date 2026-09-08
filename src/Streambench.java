@@ -31,10 +31,21 @@ public final class Streambench {
     private final String sha256;
     private final int maxStreams;
     private final Semaphore slots;
+    private final Distributed distributed;
     private final ScheduledThreadPoolExecutor deadlines = new ScheduledThreadPoolExecutor(
         1, Thread.ofPlatform().daemon().name("stream-deadline").factory());
 
     private Streambench(Path fixture, int maxStreams) throws Exception {
+        this(fixture, maxStreams, Distributed.peers(System.getenv()), Distributed.Limits.DEFAULT);
+    }
+
+    Streambench(Path fixture, int maxStreams, java.util.Map<String, java.net.URI> peers,
+                Distributed.Limits limits) throws Exception {
+        this(fixture, maxStreams, peers, limits, null);
+    }
+
+    Streambench(Path fixture, int maxStreams, java.util.Map<String, java.net.URI> peers,
+                Distributed.Limits limits, java.net.http.HttpClient http) throws Exception {
         byte[] raw = Files.readAllBytes(fixture);
         // Validate UTF-8 without decoding/re-encoding individual JSON records.
         StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(raw));
@@ -64,11 +75,12 @@ public final class Streambench {
         this.maxStreams = maxStreams;
         slots = new Semaphore(maxStreams);
         deadlines.setRemoveOnCancelPolicy(true);
+        distributed = new Distributed(frames, done, slots, deadlines, this::parameters, peers, limits, http);
     }
 
-    private enum Mode { PACED, BURST, UNPACED }
+    enum Mode { PACED, BURST, UNPACED }
 
-    private record Parameters(Mode mode, int rate, int count) {
+    record Parameters(Mode mode, int rate, int count) {
         long ticks(int index) {
             return switch (mode) {
                 case PACED -> index;
@@ -80,7 +92,7 @@ public final class Streambench {
         long offset(int index) { return ticks(index) * SECOND / rate; }
     }
 
-    private static int decimal(String value, int maximum) {
+    static int decimal(String value, int maximum) {
         if (value.isEmpty()) throw new IllegalArgumentException("integer must not be empty");
         int number = 0;
         for (int i = 0; i < value.length(); i++) {
@@ -134,7 +146,7 @@ public final class Streambench {
         return parameters;
     }
 
-    private static String decode(String value) {
+    static String decode(String value) {
         try {
             return URLDecoder.decode(value, StandardCharsets.UTF_8);
         } catch (IllegalArgumentException invalidEncoding) {
@@ -142,13 +154,14 @@ public final class Streambench {
         }
     }
 
-    private void handle(HttpExchange exchange) throws IOException {
+    void handle(HttpExchange exchange) throws IOException {
         var headers = exchange.getResponseHeaders();
         headers.set("Access-Control-Allow-Origin", "*");
         headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
         headers.set("Cache-Control", "no-store");
         // HttpServer contexts are prefix matches; dispatch exact raw paths here.
         String path = exchange.getRequestURI().getRawPath();
+        if (distributed.handle(exchange, path)) return;
         if (!path.equals("/health") && !path.equals("/info") && !path.equals("/stream")) {
             error(exchange, 404, "unknown path");
             return;
@@ -243,7 +256,7 @@ public final class Streambench {
         }
     }
 
-    private static void json(HttpExchange exchange, int status, byte[] body) throws IOException {
+    static void json(HttpExchange exchange, int status, byte[] body) throws IOException {
         try {
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
             // HEAD has status/headers but, as required by HTTP, no response body.
@@ -254,7 +267,7 @@ public final class Streambench {
         }
     }
 
-    private static void error(HttpExchange exchange, int status, String reason) throws IOException {
+    static void error(HttpExchange exchange, int status, String reason) throws IOException {
         // Every reason is a fixed string; never echo untrusted input into JSON.
         json(exchange, status, ("{\"error\":\"" + reason + "\"}").getBytes(StandardCharsets.UTF_8));
     }
@@ -266,6 +279,11 @@ public final class Streambench {
         } catch (IllegalArgumentException invalid) {
             throw new IllegalArgumentException(name + ": " + invalid.getMessage());
         }
+    }
+
+    void close() {
+        distributed.close();
+        deadlines.shutdownNow();
     }
 
     public static void main(String[] args) throws Exception {
@@ -285,9 +303,9 @@ public final class Streambench {
         server.setExecutor(workers);
         server.createContext("/", app::handle);
         Runtime.getRuntime().addShutdownHook(Thread.ofPlatform().unstarted(() -> {
+            app.close();
             server.stop(0);
             workers.shutdownNow();
-            app.deadlines.shutdownNow();
         }));
         server.start();
         System.err.println("streambench-java listening on 0.0.0.0:" + port);
